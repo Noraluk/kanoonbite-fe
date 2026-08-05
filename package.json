@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "qr": "node scripts/generate-table-qr.mjs"
+    "qr": "node scripts/generate-table-qr.mjs",
+    "deploy": "npm run build && wrangler deploy",
+    "deploy:dry-run": "npm run build && wrangler deploy --dry-run"
   },
   "dependencies": {
     "lucide-react": "^1.28.0",
@@ -27,6 +29,7 @@
     "qrcode": "^1.5.4",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
-    "vite": "^8.2.0"
+    "vite": "^8.2.0",
+    "wrangler": "^4.119.0"
   }
 }

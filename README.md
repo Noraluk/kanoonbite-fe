@@ -74,3 +74,41 @@ npm run qr -- --table=12 --base-url=https://order.example.com
 
 สำหรับ production ควรตรวจสอบหมายเลขโต๊ะกับ API ของร้านก่อนรับออเดอร์ และหากต้องการ
 ป้องกันการแก้เลขโต๊ะใน URL ควรเปลี่ยนจากเลขโต๊ะตรง ๆ เป็น signed table token ที่ backend ออกให้
+
+## CI/CD — Cloudflare Workers
+
+โปรเจกต์ deploy เป็น Cloudflare Workers Static Assets โดยใช้ `wrangler.jsonc`
+และตั้งค่า SPA fallback เพื่อให้ route เช่น `/cart?table=12` เปิดโดยตรงได้
+
+แยก workflow ตามหน้าที่:
+
+- `.github/workflows/ci.yml` — ทุก push และ pull request รัน `npm ci`, lint
+  และ production build โดยไม่มีสิทธิ์เข้าถึง Cloudflare secrets
+- `.github/workflows/cd.yml` — รอ workflow `CI` ของ branch `main` สำเร็จจาก push
+  แล้วจึง checkout commit ที่ผ่านการตรวจและ deploy
+
+### ตั้งค่า Cloudflare
+
+1. ใน Cloudflare Dashboard สร้าง API Token จาก template **Edit Cloudflare Workers**
+   และจำกัด resource ให้เหลือเฉพาะ account ที่ต้องการ
+2. คัดลอก **Account ID** จาก Cloudflare Dashboard
+3. ไปที่ GitHub repository → **Settings → Secrets and variables → Actions**
+4. เพิ่ม Repository secrets:
+   - `CLOUDFLARE_API_TOKEN`
+   - `CLOUDFLARE_ACCOUNT_ID`
+5. Push commit เข้า `main` แล้วตรวจผลที่แท็บ **Actions**
+
+Worker จะใช้ชื่อ `kanoonbite-fe` ตาม `wrangler.jsonc` และหลัง deploy ครั้งแรก
+Cloudflare จะแสดง URL รูปแบบ `https://kanoonbite-fe.<subdomain>.workers.dev`
+
+ทดสอบ deployment package โดยไม่ upload:
+
+```bash
+npm run deploy:dry-run
+```
+
+หาก login Wrangler ไว้แล้ว สามารถ deploy จากเครื่องได้ด้วย:
+
+```bash
+npm run deploy
+```
