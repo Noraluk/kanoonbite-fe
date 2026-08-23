@@ -338,6 +338,18 @@ describe('admin backoffice', () => {
       method: 'GET',
       cache: 'no-store',
     }))
+
+    const realtimeOrderCard = screen.getByText('#4').closest('article')
+    expect(realtimeOrderCard).not.toBeNull()
+    fireEvent.click(within(realtimeOrderCard!).getByRole('button', { name: 'Start grilling' }))
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(7))
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      7,
+      'http://localhost:3001/api/v1/kitchen/orders/order-2/status',
+      expect.objectContaining({ method: 'PATCH' }),
+    )
+    expect(screen.queryByText(/still syncing/i)).not.toBeInTheDocument()
+
     view.unmount()
     expect(socket.close).toHaveBeenCalled()
   })
