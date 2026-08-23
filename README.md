@@ -89,7 +89,8 @@ npm run qr -- --label=A01 --qr-code='kbq_<table-uuid>.<random-secret>' --base-ur
 ออกทาง console เมื่อสแกนแล้ว Frontend จะลบ fragment ทันที แลกเป็น Customer JWT
 ผ่าน Backend และเก็บ token ไว้ใน `sessionStorage` เท่านั้น
 
-Production build ต้องกำหนด `VITE_API_BASE_URL` ใน build environment เป็น URL ของ
+Production build มีค่า public API เริ่มต้นใน `.env.production` และสามารถกำหนด
+`VITE_API_BASE_URL` ใน build environment เพื่อ override URL ของ
 KanoonBite Backend โดยไม่ใส่ JWT secret หรือ hardcode production URL ลง source code
 
 ## Admin / Kitchen Backoffice
