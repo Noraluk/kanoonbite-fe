@@ -92,6 +92,23 @@ npm run qr -- --label=A01 --qr-code='kbq_<table-uuid>.<random-secret>' --base-ur
 Production build ต้องกำหนด `VITE_API_BASE_URL` ใน build environment เป็น URL ของ
 KanoonBite Backend โดยไม่ใส่ JWT secret หรือ hardcode production URL ลง source code
 
+## Admin / Kitchen Backoffice
+
+เปิดหน้าเข้าสู่ระบบที่ `/admin/login` เช่น `http://localhost:5173/admin/login`
+Frontend จะเรียก `POST /api/v1/admin/auth/login` และเก็บ Admin JWT ไว้ใน
+`sessionStorage` จนหมดอายุ โดยไม่เก็บรหัสผ่าน
+
+หน้า `/admin/orders` โหลด active orders จาก `GET /api/v1/kitchen/orders` และรายการที่
+เสร็จแล้วจาก `GET /api/v1/kitchen/orders?status=completed` ทุก 4 วินาที เพื่อให้
+completed orders ยังคงแสดงอยู่ โดยหยุด polling เมื่อแท็บถูกซ่อน การเปลี่ยนสถานะจะเรียก
+`PATCH /api/v1/kitchen/orders/:orderId/status` ตามลำดับที่ Backend อนุญาต
+
+Development ใช้ Backend ที่ `http://localhost:3001` เป็นค่าเริ่มต้น หรือกำหนดเองด้วย:
+
+```bash
+VITE_API_BASE_URL=http://localhost:3001 npm run dev
+```
+
 ## CI/CD — Cloudflare Workers
 
 โปรเจกต์ deploy เป็น Cloudflare Workers Static Assets โดยใช้ `wrangler.jsonc`
