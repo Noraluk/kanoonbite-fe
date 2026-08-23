@@ -130,7 +130,8 @@ VITE_API_BASE_URL=http://localhost:3001 npm run dev
 4. เพิ่ม Repository secrets:
    - `CLOUDFLARE_API_TOKEN`
    - `CLOUDFLARE_ACCOUNT_ID`
-5. ใน production environment เพิ่ม variable `VITE_API_BASE_URL` เป็น URL ของ Backend
+5. ใน production environment เพิ่ม variable `VITE_API_BASE_URL` เป็น HTTPS URL ของ Backend
+   (workflow รองรับการเก็บเป็น environment secret ชื่อเดียวกันด้วย)
 6. Push commit เข้า `main` แล้วตรวจผลที่แท็บ **Actions**
 
 Worker จะใช้ชื่อ `kanoonbite-fe` ตาม `wrangler.jsonc` และหลัง deploy ครั้งแรก
