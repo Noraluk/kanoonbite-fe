@@ -227,7 +227,18 @@ export function useKitchenOrders() {
 
     try {
       const updatedOrder = await updateKitchenOrderStatus(accessToken, orderId, status)
-      setOrders((current) => current.map((order) => order.id === updatedOrder.id ? updatedOrder : order))
+      const realtimeOrder = realtimeOrdersRef.current.get(updatedOrder.id)
+      const latestOrder = realtimeOrder
+        && Date.parse(realtimeOrder.updatedAt) > Date.parse(updatedOrder.updatedAt)
+        ? realtimeOrder
+        : updatedOrder
+      // The PATCH response is authoritative. Retain it while the list endpoint catches up,
+      // otherwise a stale GET can immediately revert the card to its previous status.
+      realtimeOrdersRef.current.set(updatedOrder.id, latestOrder)
+      setOrders((current) => mergeOrders(
+        [...current.filter((order) => order.id !== updatedOrder.id), latestOrder],
+        [],
+      ))
       await refresh(true)
     } catch (requestError) {
       if (requestError instanceof ApiError && requestError.status === 409) {

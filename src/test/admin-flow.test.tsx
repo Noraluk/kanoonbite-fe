@@ -410,4 +410,69 @@ describe('admin backoffice', () => {
 
     view.unmount()
   })
+
+  it('keeps the updated status when the post-PATCH order list is stale', async () => {
+    authenticate()
+    MockWebSocket.instances = []
+    vi.stubGlobal('WebSocket', MockWebSocket)
+    const createdAt = new Date().toISOString()
+    const newOrder = {
+      ...createOrder('received'),
+      id: 'order-21',
+      orderNumber: 21,
+      createdAt,
+      updatedAt: createdAt,
+    }
+    const preparingOrder = {
+      ...newOrder,
+      status: 'preparing' as const,
+      updatedAt: new Date(Date.now() + 1_000).toISOString(),
+    }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(ordersResponse('received'))
+      .mockResolvedValueOnce(emptyOrdersResponse())
+      .mockResolvedValueOnce(jsonResponse({
+        data: {
+          ticket: 'single-use-ticket',
+          expiresAt: new Date(Date.now() + 30_000).toISOString(),
+          websocketUrl: 'wss://api.example.com/api/v1/kitchen/events',
+        },
+      }))
+      .mockResolvedValueOnce(ordersResponse('received'))
+      .mockResolvedValueOnce(emptyOrdersResponse())
+      .mockResolvedValueOnce(ordersResponse('received'))
+      .mockResolvedValueOnce(emptyOrdersResponse())
+      .mockResolvedValueOnce(jsonResponse({ data: preparingOrder }))
+      // The list endpoint has not caught up with the successful PATCH yet.
+      .mockResolvedValueOnce(ordersResponse('received'))
+      .mockResolvedValueOnce(emptyOrdersResponse())
+    vi.stubGlobal('fetch', fetchMock)
+    const view = renderAt('/admin/orders')
+
+    await vi.waitFor(() => expect(MockWebSocket.instances).toHaveLength(1))
+    const socket = MockWebSocket.instances[0]
+    act(() => socket.open())
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5))
+
+    act(() => socket.receive({
+      type: 'order.created',
+      eventId: 'event-21',
+      venueId: 'venue-1',
+      orderId: newOrder.id,
+      occurredAt: createdAt,
+      updatedAt: newOrder.updatedAt,
+      order: newOrder,
+    }))
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(7))
+
+    const orderCard = screen.getByText('#21').closest('article')
+    expect(orderCard).not.toBeNull()
+    fireEvent.click(within(orderCard!).getByRole('button', { name: 'Start grilling' }))
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(10))
+    expect(within(orderCard!).getByText('Cooking')).toBeInTheDocument()
+    expect(within(orderCard!).getByRole('button', { name: 'Mark ready' })).toBeInTheDocument()
+
+    view.unmount()
+  })
 })
