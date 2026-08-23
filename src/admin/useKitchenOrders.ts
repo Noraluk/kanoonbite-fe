@@ -34,6 +34,25 @@ function mergeOrders(activeOrders: Order[], completedOrders: Order[]) {
   })
 }
 
+function reconcileRealtimeOrders(apiOrders: Order[], realtimeOrders: Map<string, Order>) {
+  const reconciledOrders = [...apiOrders]
+
+  for (const [orderId, realtimeOrder] of realtimeOrders) {
+    const apiOrderIndex = reconciledOrders.findIndex((order) => order.id === orderId)
+    const apiOrder = reconciledOrders[apiOrderIndex]
+
+    if (apiOrder && Date.parse(apiOrder.updatedAt) >= Date.parse(realtimeOrder.updatedAt)) {
+      realtimeOrders.delete(orderId)
+      continue
+    }
+
+    if (apiOrderIndex >= 0) reconciledOrders[apiOrderIndex] = realtimeOrder
+    else reconciledOrders.push(realtimeOrder)
+  }
+
+  return mergeOrders(reconciledOrders, [])
+}
+
 export function useKitchenOrders() {
   const accessToken = useAdminAuthStore((state) => state.accessToken)
   const venueId = useAdminAuthStore((state) => state.admin?.venueId)
@@ -48,6 +67,7 @@ export function useKitchenOrders() {
   const pausedUntilRef = useRef(0)
   const knownOrderIdsRef = useRef<Set<string>>(new Set())
   const hasLoadedOrdersRef = useRef(false)
+  const realtimeOrdersRef = useRef<Map<string, Order>>(new Map())
 
   const abortActiveRequest = useCallback(() => {
     const activeRequest = requestRef.current
@@ -91,7 +111,10 @@ export function useKitchenOrders() {
     try {
       const activeOrders = await getKitchenOrders(accessToken, undefined, controller.signal)
       const completedOrders = await getKitchenOrders(accessToken, 'completed', controller.signal)
-      const nextOrders = mergeOrders(activeOrders, completedOrders)
+      const apiOrders = mergeOrders(activeOrders, completedOrders)
+      // A realtime event can arrive before a read replica exposes the new row.
+      // Keep its snapshot until the API returns the same or a newer version.
+      const nextOrders = reconcileRealtimeOrders(apiOrders, realtimeOrdersRef.current)
       if (hasLoadedOrdersRef.current) {
         const receivedOrders = nextOrders.filter((order) => (
           order.status === 'received' && !knownOrderIdsRef.current.has(order.id)
@@ -126,6 +149,13 @@ export function useKitchenOrders() {
   const handleRealtimeEvent = useCallback((event: KitchenRealtimeEvent) => {
     const realtimeOrder = event.order
     if (realtimeOrder) {
+      const pendingRealtimeOrder = realtimeOrdersRef.current.get(realtimeOrder.id)
+      if (
+        !pendingRealtimeOrder
+        || Date.parse(realtimeOrder.updatedAt) >= Date.parse(pendingRealtimeOrder.updatedAt)
+      ) {
+        realtimeOrdersRef.current.set(realtimeOrder.id, realtimeOrder)
+      }
       knownOrderIdsRef.current.add(realtimeOrder.id)
       setOrders((current) => {
         const existing = current.find((order) => order.id === realtimeOrder.id)

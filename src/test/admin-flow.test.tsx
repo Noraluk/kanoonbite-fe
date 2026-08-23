@@ -341,4 +341,61 @@ describe('admin backoffice', () => {
     view.unmount()
     expect(socket.close).toHaveBeenCalled()
   })
+
+  it('keeps a realtime order when immediate API reconciliation returns stale data', async () => {
+    authenticate()
+    MockWebSocket.instances = []
+    vi.stubGlobal('WebSocket', MockWebSocket)
+    const realtimeTimestamp = new Date().toISOString()
+    const newOrder = {
+      ...createOrder('received'),
+      id: 'order-16',
+      orderNumber: 16,
+      createdAt: realtimeTimestamp,
+      updatedAt: realtimeTimestamp,
+    }
+    let resolveStaleReconciliation!: (response: Response) => void
+    const staleReconciliation = new Promise<Response>((resolve) => {
+      resolveStaleReconciliation = resolve
+    })
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(ordersResponse('received'))
+      .mockResolvedValueOnce(emptyOrdersResponse())
+      .mockResolvedValueOnce(jsonResponse({
+        data: {
+          ticket: 'single-use-ticket',
+          expiresAt: new Date(Date.now() + 30_000).toISOString(),
+          websocketUrl: 'wss://api.example.com/api/v1/kitchen/events',
+        },
+      }))
+      .mockResolvedValueOnce(ordersResponse('received'))
+      .mockResolvedValueOnce(emptyOrdersResponse())
+      .mockImplementationOnce(() => staleReconciliation)
+      .mockResolvedValueOnce(emptyOrdersResponse())
+    vi.stubGlobal('fetch', fetchMock)
+    const view = renderAt('/admin/orders')
+
+    await vi.waitFor(() => expect(MockWebSocket.instances).toHaveLength(1))
+    const socket = MockWebSocket.instances[0]
+    act(() => socket.open())
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5))
+
+    act(() => socket.receive({
+      type: 'order.created',
+      eventId: 'event-16',
+      venueId: 'venue-1',
+      orderId: newOrder.id,
+      occurredAt: new Date().toISOString(),
+      updatedAt: newOrder.updatedAt,
+      order: newOrder,
+    }))
+
+    expect(await screen.findByText('#16')).toBeInTheDocument()
+    resolveStaleReconciliation(ordersResponse('received'))
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(7))
+    expect(screen.getByText('#16')).toBeInTheDocument()
+    expect(document.querySelector('.admin-order-card')).toHaveTextContent('#16')
+
+    view.unmount()
+  })
 })
