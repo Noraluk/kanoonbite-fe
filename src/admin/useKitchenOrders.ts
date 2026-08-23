@@ -4,8 +4,9 @@ import { getKitchenOrders, type NextOrderStatus, updateKitchenOrderStatus } from
 import { ApiError } from '../types/api'
 import type { Order } from '../types/order'
 import { useAdminAuthStore } from './adminAuthStore'
+import { useKitchenRealtime } from './useKitchenRealtime'
 
-const POLL_INTERVAL_MS = 4_000
+const POLL_INTERVAL_MS = 30_000
 const RATE_LIMIT_PAUSE_MS = 15_000
 
 function isAbortError(error: unknown) {
@@ -22,6 +23,7 @@ function mergeOrders(activeOrders: Order[], completedOrders: Order[]) {
 
 export function useKitchenOrders() {
   const accessToken = useAdminAuthStore((state) => state.accessToken)
+  const venueId = useAdminAuthStore((state) => state.admin?.venueId)
   const signOut = useAdminAuthStore((state) => state.signOut)
   const navigate = useNavigate()
   const [orders, setOrders] = useState<Order[]>([])
@@ -132,11 +134,28 @@ export function useKitchenOrders() {
     }
   }, [accessToken, handleApiError, refresh])
 
+  const handleRealtimeUnauthorized = useCallback(() => {
+    signOut()
+    navigate('/admin/login', { replace: true })
+  }, [navigate, signOut])
+
+  const connectionStatus = useKitchenRealtime({
+    accessToken,
+    enabled: !isInitialLoading,
+    venueId,
+    // Reconcile after every connection so changes made during a disconnect cannot be missed.
+    onConnected: () => { void refresh(true) },
+    onEvent: () => { void refresh(true) },
+    onUnauthorized: handleRealtimeUnauthorized,
+  })
+
   return {
     orders,
     isInitialLoading,
     error,
     pendingOrderIds,
+    connectionStatus,
+    pollIntervalMs: POLL_INTERVAL_MS,
     refresh: () => refresh(true),
     updateStatus,
   }

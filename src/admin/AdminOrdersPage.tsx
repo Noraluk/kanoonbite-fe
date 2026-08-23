@@ -1,4 +1,4 @@
-import { AlertCircle, ChefHat, Clock3, LoaderCircle, RefreshCw, WifiOff } from 'lucide-react'
+import { AlertCircle, ChefHat, Clock3, LoaderCircle, RefreshCw, Wifi, WifiOff } from 'lucide-react'
 import type { NextOrderStatus } from '../api/admin.api'
 import type { Order, OrderStatus } from '../types/order'
 import { formatOrderPrice } from '../utils/order'
@@ -35,8 +35,15 @@ function formatRelativeTime(createdAt: string) {
 }
 
 export function AdminOrdersPage() {
-  const { orders, isInitialLoading, error, pendingOrderIds, refresh, updateStatus } = useKitchenOrders()
+  const { orders, isInitialLoading, error, pendingOrderIds, connectionStatus, pollIntervalMs, refresh, updateStatus } = useKitchenOrders()
   const openOrders = orders.filter((order) => ['received', 'preparing', 'ready'].includes(order.status)).length
+  const visibleConnectionStatus = isInitialLoading ? 'connecting' : connectionStatus
+  const connectionCopy = {
+    connecting: 'Connecting to live orders',
+    live: 'Live',
+    reconnecting: 'Reconnecting — backup refresh is active',
+    offline: `Offline — refreshing every ${pollIntervalMs / 1_000} seconds`,
+  }[visibleConnectionStatus]
 
   return (
     <section className="admin-page admin-orders-page" aria-labelledby="admin-orders-title">
@@ -45,7 +52,16 @@ export function AdminOrdersPage() {
           <p className="admin-eyebrow">Kitchen counter</p>
           <h1 id="admin-orders-title">Live orders</h1>
         </div>
-        <p className="admin-demo-label"><RefreshCw aria-hidden="true" size={18} /> Auto-refreshes every 4 seconds</p>
+        <p
+          className={`admin-connection-status admin-connection-status--${visibleConnectionStatus}`}
+          role="status"
+          aria-atomic="true"
+        >
+          {visibleConnectionStatus === 'live' ? <Wifi aria-hidden="true" size={18} /> : visibleConnectionStatus === 'offline'
+            ? <WifiOff aria-hidden="true" size={18} />
+            : <RefreshCw aria-hidden="true" className="admin-spin" size={18} />}
+          {connectionCopy}
+        </p>
       </div>
 
       <div className="admin-stat-grid" aria-label="Order summary">

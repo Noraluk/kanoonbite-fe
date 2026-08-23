@@ -44,6 +44,27 @@ function emptyOrdersResponse() {
   return jsonResponse({ data: { orders: [] } })
 }
 
+class MockWebSocket extends EventTarget {
+  static instances: MockWebSocket[] = []
+
+  readonly url: string
+  readonly close = vi.fn()
+
+  constructor(url: string | URL) {
+    super()
+    this.url = String(url)
+    MockWebSocket.instances.push(this)
+  }
+
+  open() {
+    this.dispatchEvent(new Event('open'))
+  }
+
+  receive(data: unknown) {
+    this.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(data) }))
+  }
+}
+
 function authenticate() {
   useAdminAuthStore.getState().setSession('admin-jwt', 900, admin)
 }
@@ -235,5 +256,50 @@ describe('admin backoffice', () => {
 
     expect(await screen.findByText('#3')).toBeInTheDocument()
     expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('refetches immediately when a realtime order event arrives', async () => {
+    authenticate()
+    MockWebSocket.instances = []
+    vi.stubGlobal('WebSocket', MockWebSocket)
+    const newOrder = { ...createOrder('received'), id: 'order-2', orderNumber: 4 }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(ordersResponse('received'))
+      .mockResolvedValueOnce(emptyOrdersResponse())
+      .mockResolvedValueOnce(jsonResponse({
+        data: {
+          ticket: 'single-use-ticket',
+          expiresAt: new Date(Date.now() + 30_000).toISOString(),
+          websocketUrl: 'wss://api.example.com/api/v1/kitchen/events',
+        },
+      }))
+      .mockResolvedValueOnce(ordersResponse('received'))
+      .mockResolvedValueOnce(emptyOrdersResponse())
+      .mockResolvedValueOnce(jsonResponse({ data: { orders: [createOrder('received'), newOrder] } }))
+      .mockResolvedValueOnce(emptyOrdersResponse())
+    vi.stubGlobal('fetch', fetchMock)
+    const view = renderAt('/admin/orders')
+
+    await vi.waitFor(() => expect(MockWebSocket.instances).toHaveLength(1))
+    const socket = MockWebSocket.instances[0]
+    expect(socket.url).toContain('ticket=single-use-ticket')
+    expect(socket.url).not.toContain('admin-jwt')
+
+    act(() => socket.open())
+    expect(await screen.findByRole('status')).toHaveTextContent('Live')
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5))
+
+    act(() => socket.receive({
+      type: 'order.created',
+      eventId: 'event-1',
+      venueId: 'venue-1',
+      orderId: 'order-2',
+      occurredAt: new Date().toISOString(),
+    }))
+
+    expect(await screen.findByText('#4')).toBeInTheDocument()
+    expect(fetchMock).toHaveBeenCalledTimes(7)
+    view.unmount()
+    expect(socket.close).toHaveBeenCalled()
   })
 })

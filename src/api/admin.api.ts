@@ -27,6 +27,16 @@ interface KitchenOrderResponse {
   data: Order
 }
 
+export interface KitchenRealtimeTicket {
+  ticket: string
+  expiresAt: string
+  websocketUrl: string
+}
+
+type KitchenRealtimeTicketResponse = KitchenRealtimeTicket | {
+  data: KitchenRealtimeTicket
+}
+
 export type NextOrderStatus = Exclude<OrderStatus, 'received'>
 
 export function loginAdmin(email: string, password: string, signal?: AbortSignal) {
@@ -71,4 +81,13 @@ export async function updateKitchenOrderStatus(
     },
   )
   return response.data
+}
+
+export async function getKitchenRealtimeTicket(accessToken: string, signal?: AbortSignal) {
+  const response = await apiRequest<KitchenRealtimeTicketResponse>('/api/v1/kitchen/realtime-ticket', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal,
+  })
+  return 'data' in response ? response.data : response
 }
