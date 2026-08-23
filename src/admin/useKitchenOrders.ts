@@ -24,9 +24,14 @@ function isAbortError(error: unknown) {
 function mergeOrders(activeOrders: Order[], completedOrders: Order[]) {
   const ordersById = new Map<string, Order>()
   for (const order of [...activeOrders, ...completedOrders]) ordersById.set(order.id, order)
-  return Array.from(ordersById.values()).sort((left, right) => (
-    new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
-  ))
+  return Array.from(ordersById.values()).sort((left, right) => {
+    const leftIsClosed = left.status === 'completed' || left.status === 'cancelled'
+    const rightIsClosed = right.status === 'completed' || right.status === 'cancelled'
+    if (leftIsClosed !== rightIsClosed) return leftIsClosed ? 1 : -1
+
+    const createdAtDifference = Date.parse(right.createdAt) - Date.parse(left.createdAt)
+    return createdAtDifference || right.orderNumber - left.orderNumber
+  })
 }
 
 export function useKitchenOrders() {
@@ -91,7 +96,7 @@ export function useKitchenOrders() {
         const receivedOrders = nextOrders.filter((order) => (
           order.status === 'received' && !knownOrderIdsRef.current.has(order.id)
         ))
-        const latestOrder = receivedOrders.at(-1)
+        const latestOrder = receivedOrders[0]
         if (latestOrder) {
           setNewOrderNotification({
             id: latestOrder.id,

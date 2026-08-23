@@ -330,9 +330,14 @@ describe('admin backoffice', () => {
     }))
 
     expect(await screen.findByText('#4')).toBeInTheDocument()
+    expect(document.querySelector('.admin-order-card')).toHaveTextContent('#4')
     expect(screen.getByRole('alert')).toHaveTextContent('New order #4')
     expect(screen.getByRole('alert')).toHaveTextContent('Table 1 just placed an order.')
     expect(fetchMock).toHaveBeenCalledTimes(6)
+    expect(fetchMock).toHaveBeenNthCalledWith(6, 'http://localhost:3001/api/v1/kitchen/orders', expect.objectContaining({
+      method: 'GET',
+      cache: 'no-store',
+    }))
     view.unmount()
     expect(socket.close).toHaveBeenCalled()
   })

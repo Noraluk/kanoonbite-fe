@@ -57,6 +57,7 @@ export async function getKitchenOrders(
   const response = await apiRequest<KitchenOrdersResponse>(`/api/v1/kitchen/orders${query}`, {
     method: 'GET',
     headers: { Authorization: `Bearer ${accessToken}` },
+    cache: 'no-store',
     signal,
   })
   return response.data.orders
