@@ -1,19 +1,21 @@
-import { ArrowLeft, ArrowRight, Minus, Plus, Trash2 } from 'lucide-react'
-import { Link, useOutletContext } from 'react-router-dom'
-import { menuItems } from '../data/menuItems'
+import { ArrowLeft, ArrowRight, ImageOff, Minus, Plus, Trash2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { getValidTableSession } from '../auth/table-session.storage'
+import { ScanQrAgain } from '../components/menu/ScanQrAgain'
 import { useCartStore } from '../store/cartStore'
-
-interface LayoutContext {
-  tableNumber: number | null
-}
+import { formatMenuPrice } from '../utils/menu'
 
 export function CartScreen() {
-  const { tableNumber } = useOutletContext<LayoutContext>()
+  const tableSession = getValidTableSession()
   const cartItems = useCartStore((state) => state.items)
-  const addItem = useCartStore((state) => state.addItem)
+  const increaseItem = useCartStore((state) => state.increaseItem)
   const decreaseItem = useCartStore((state) => state.decreaseItem)
   const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
-  const menuUrl = tableNumber ? `/?table=${tableNumber}` : '/'
+  const menuUrl = '/menu'
+
+  if (!tableSession) {
+    return <ScanQrAgain message="Your table session has expired. Please scan the QR code again." />
+  }
 
   return (
     <section className="flow-screen" aria-labelledby="cart-heading">
@@ -33,22 +35,24 @@ export function CartScreen() {
         <>
           <div className="cart-list">
             {cartItems.map((cartItem) => {
-              const menuItem = menuItems.find((item) => item.id === cartItem.id)
-              if (!menuItem) return null
               return (
-                <article key={cartItem.id} className="cart-card">
-                  <div className={`food-art food-art--${menuItem.imageTone}`} aria-hidden="true">
-                    {menuItem.emoji}
+                <article key={cartItem.productId} className="cart-card">
+                  <div className="food-image-wrap food-image-wrap--cart">
+                    {cartItem.imageUrl ? (
+                      <img className="food-image" src={cartItem.imageUrl} alt="" />
+                    ) : (
+                      <div className="food-image-fallback" aria-hidden="true"><ImageOff size={26} /></div>
+                    )}
                   </div>
                   <div className="cart-card__copy">
                     <h2>{cartItem.name}</h2>
-                    <p>฿{cartItem.price.toLocaleString('th-TH')} each</p>
+                    <p>{formatMenuPrice(cartItem.price)} each</p>
                   </div>
                   <div className="cart-card__actions">
                     <div className="quantity-control" aria-label={`Quantity ${cartItem.quantity}`}>
                       <button
                         type="button"
-                        onClick={() => decreaseItem(cartItem.id)}
+                        onClick={() => decreaseItem(cartItem.productId)}
                         aria-label={`Decrease ${cartItem.name}`}
                         className="round-control round-control--minus"
                       >
@@ -57,7 +61,7 @@ export function CartScreen() {
                       <span>{cartItem.quantity}</span>
                       <button
                         type="button"
-                        onClick={() => addItem(menuItem)}
+                        onClick={() => increaseItem(cartItem.productId)}
                         aria-label={`Increase ${cartItem.name}`}
                         className="round-control round-control--add"
                       >
@@ -67,7 +71,7 @@ export function CartScreen() {
                     <button
                       type="button"
                       onClick={() => {
-                        for (let index = 0; index < cartItem.quantity; index += 1) decreaseItem(cartItem.id)
+                        for (let index = 0; index < cartItem.quantity; index += 1) decreaseItem(cartItem.productId)
                       }}
                       className="remove-button"
                       aria-label={`Remove ${cartItem.name}`}
@@ -82,11 +86,11 @@ export function CartScreen() {
 
           <div className="subtotal-row">
             <span>Subtotal</span>
-            <strong>฿{total.toLocaleString('th-TH')}</strong>
+            <strong>{formatMenuPrice(total)}</strong>
           </div>
 
           <div className="bottom-action-wrap">
-            <Link to={`/review?table=${tableNumber}`} className="primary-action">
+            <Link to="/review" className="primary-action">
               <span>Checkout</span>
               <ArrowRight aria-hidden="true" size={24} strokeWidth={3} />
             </Link>

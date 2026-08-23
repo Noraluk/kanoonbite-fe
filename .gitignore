@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Generated table QR codes contain rotating table secrets; keep them local for printing.
+public/qrcodes/table-*.png
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

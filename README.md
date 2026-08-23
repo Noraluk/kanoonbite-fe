@@ -23,19 +23,29 @@ Tailwind CSS v4 ใช้ Vite plugin ใน `vite.config.ts` และ import �
 npm run dev
 ```
 
-ตรวจสอบ production build และ lint:
+คัดลอก environment file และตั้ง Backend URL สำหรับ development:
 
 ```bash
-npm run build
+cp .env.example .env.local
+```
+
+ตรวจสอบ lint, typecheck, tests และ production build:
+
+```bash
 npm run lint
+npm run typecheck
+npm test
+npm run build
 ```
 
 ## โครงสร้าง `src/`
 
 ```text
 src/
-├── components/
-│   └── layout/          # Layout และ navigation ที่ใช้ร่วมกัน
+├── api/                 # API client และ customer endpoints
+├── auth/                # QR fragment และ sessionStorage helpers
+├── components/          # Layout และ menu UI components
+├── hooks/               # Table session และ menu data hooks
 ├── pages/               # หน้าจอระดับ route
 ├── routes/              # Route configuration
 ├── store/               # Zustand global stores
@@ -50,35 +60,42 @@ src/
 
 ## Routes เริ่มต้น
 
-- `/?table=12` — MenuScreen สำหรับโต๊ะ 12 (URL ที่ใส่ใน QR Code)
-- `/cart?table=12` — CartScreen สำหรับโต๊ะ 12
+- `/menu#qr=<QR_CODE>` — แลก QR เป็น Customer JWT แล้วโหลดเมนู
+- `/cart` — ตะกร้าของ table session ปัจจุบัน
+- `/review` — ตรวจรายการและส่งออเดอร์ด้วย idempotency key
+- `/orders/:orderId` — สถานะออเดอร์จาก Backend พร้อม polling ทุก 4 วินาที
+
+การส่งออเดอร์ใช้ `POST /api/v1/customer/orders` และส่งเฉพาะ `productId`,
+`quantity` และ kitchen note แบบ string เท่านั้น ราคาจริง หมายเลขโต๊ะ และสถานะออเดอร์
+ยึดจาก Backend response โดยทุก customer request ส่ง Table JWT ผ่าน Authorization header
 - `*` — NotFoundScreen
 
 ## สร้าง QR Code ประจำโต๊ะ
 
-QR Code ของแต่ละโต๊ะต้องชี้มาที่ production URL และมี query parameter
-`table` ตัวอย่างสำหรับโต๊ะ 12:
+QR Code ของแต่ละโต๊ะต้องชี้มาที่ `/menu` และเก็บ QR secret ใน URL fragment
+เพื่อไม่ให้ secret ถูกส่งไปใน server logs หรือ Referer header:
 
 ```text
-https://order.example.com/?table=12
+https://order.example.com/menu#qr=kbq_<table-uuid>.<random-secret>
 ```
 
 สร้างไฟล์ PNG ด้วยคำสั่ง:
 
 ```bash
-npm run qr -- --table=12 --base-url=https://order.example.com
+npm run qr -- --label=A01 --qr-code='kbq_<table-uuid>.<random-secret>' --base-url=https://order.example.com
 ```
 
-ไฟล์จะถูกสร้างที่ `public/qrcodes/table-12.png` เมื่อลูกค้าสแกน แอปจะอ่าน
-หมายเลขโต๊ะจาก URL และเก็บไว้ใน `sessionStorage` ตลอดการสั่งอาหารในแท็บนั้น
+ไฟล์จะถูกสร้างที่ `public/qrcodes/table-A01.png` สคริปต์จะไม่พิมพ์ QR secret
+ออกทาง console เมื่อสแกนแล้ว Frontend จะลบ fragment ทันที แลกเป็น Customer JWT
+ผ่าน Backend และเก็บ token ไว้ใน `sessionStorage` เท่านั้น
 
-สำหรับ production ควรตรวจสอบหมายเลขโต๊ะกับ API ของร้านก่อนรับออเดอร์ และหากต้องการ
-ป้องกันการแก้เลขโต๊ะใน URL ควรเปลี่ยนจากเลขโต๊ะตรง ๆ เป็น signed table token ที่ backend ออกให้
+Production build ต้องกำหนด `VITE_API_BASE_URL` ใน build environment เป็น URL ของ
+KanoonBite Backend โดยไม่ใส่ JWT secret หรือ hardcode production URL ลง source code
 
 ## CI/CD — Cloudflare Workers
 
 โปรเจกต์ deploy เป็น Cloudflare Workers Static Assets โดยใช้ `wrangler.jsonc`
-และตั้งค่า SPA fallback เพื่อให้ route เช่น `/cart?table=12` เปิดโดยตรงได้
+และตั้งค่า SPA fallback เพื่อให้ route เช่น `/menu` และ `/cart` เปิดโดยตรงได้
 
 แยก workflow ตามหน้าที่:
 
@@ -96,7 +113,8 @@ npm run qr -- --table=12 --base-url=https://order.example.com
 4. เพิ่ม Repository secrets:
    - `CLOUDFLARE_API_TOKEN`
    - `CLOUDFLARE_ACCOUNT_ID`
-5. Push commit เข้า `main` แล้วตรวจผลที่แท็บ **Actions**
+5. ใน production environment เพิ่ม variable `VITE_API_BASE_URL` เป็น URL ของ Backend
+6. Push commit เข้า `main` แล้วตรวจผลที่แท็บ **Actions**
 
 Worker จะใช้ชื่อ `kanoonbite-fe` ตาม `wrangler.jsonc` และหลัง deploy ครั้งแรก
 Cloudflare จะแสดง URL รูปแบบ `https://kanoonbite-fe.<subdomain>.workers.dev`

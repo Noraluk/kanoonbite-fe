@@ -1,107 +1,100 @@
-import { ArrowRight, ShoppingCart } from 'lucide-react'
-import { useState } from 'react'
-import { Link, useOutletContext, useSearchParams } from 'react-router-dom'
-import { ProductCard } from '../components/menu/ProductCard'
-import { TableRequired } from '../components/menu/TableRequired'
-import { menuItems } from '../data/menuItems'
+import { ArrowRight, RefreshCw, ShoppingCart } from 'lucide-react'
+import { useCallback, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { CategoryTabs } from '../components/menu/CategoryTabs'
+import { MenuSection } from '../components/menu/MenuSection'
+import { MenuSkeleton } from '../components/menu/MenuSkeleton'
+import { ScanQrAgain } from '../components/menu/ScanQrAgain'
+import { useMenu } from '../hooks/useMenu'
+import { useTableSession } from '../hooks/useTableSession'
 import { useCartStore } from '../store/cartStore'
-import type { MenuCategory } from '../types/menu'
-
-interface LayoutContext {
-  tableNumber: number | null
-}
-
-type MenuFilter = 'all' | MenuCategory
-
-const categories: { id: MenuCategory; label: string; icon: string }[] = [
-  { id: 'grill-sets', label: 'Grill Sets', icon: '🔥' },
-  { id: 'meat', label: 'Meat', icon: '🥩' },
-  { id: 'seafood', label: 'Seafood', icon: '🦐' },
-  { id: 'sides', label: 'Sides', icon: '🥗' },
-  { id: 'drinks', label: 'Drinks', icon: '🥤' },
-]
-
-const categoryTabs: { id: MenuFilter; label: string }[] = [
-  { id: 'all', label: 'All' },
-  ...categories.map(({ id, label }) => ({ id, label })),
-]
+import { ALL_CATEGORIES, formatMenuPrice, getMenuSections } from '../utils/menu'
 
 export function MenuScreen() {
-  const { tableNumber } = useOutletContext<LayoutContext>()
-  const [searchParams] = useSearchParams()
-  const [activeCategory, setActiveCategory] = useState<MenuFilter>('all')
+  const tableSession = useTableSession()
+  const { requireNewScan } = tableSession
+  const accessToken = tableSession.status === 'authenticated' ? tableSession.session.accessToken : null
+  const handleUnauthorized = useCallback(() => {
+    requireNewScan('Your table session has expired or is no longer active. Please scan the QR code again.')
+  }, [requireNewScan])
+  const menuState = useMenu(accessToken, handleUnauthorized)
+  const [activeCategory, setActiveCategory] = useState(ALL_CATEGORIES)
   const cartItems = useCartStore((state) => state.items)
   const itemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
   const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
 
-  if (!tableNumber) {
-    return <TableRequired invalidTable={searchParams.has('table')} />
+  if (tableSession.status === 'scan-required') {
+    return <ScanQrAgain message={tableSession.message} />
   }
 
-  const visibleCategories =
-    activeCategory === 'all'
-      ? categories
-      : categories.filter((category) => category.id === activeCategory)
+  const tableLabel = tableSession.status === 'authenticated' ? tableSession.session.table.label : null
+  const sections = menuState.status === 'ready'
+    ? getMenuSections(menuState.menu, activeCategory)
+    : []
 
   return (
     <div className="menu-screen">
       <section className="menu-hero" aria-labelledby="menu-title">
         <div className="menu-hero__meta">
-          <span>Table {tableNumber} · Grill</span>
-          <span>Dine-in 🔥</span>
+          <span>{tableLabel ? `Table ${tableLabel}` : 'Opening your table…'}</span>
+          <span>Dine-in</span>
         </div>
         <div className="menu-hero__welcome">
-          <div className="mascot" aria-hidden="true">🥑</div>
           <div>
             <h1 id="menu-title">Let’s grill!</h1>
-            <p>Tap a dish to add it 🍢</p>
+            <p>Choose a dish and add it to your grill.</p>
           </div>
         </div>
       </section>
 
-      <nav className="category-tabs" aria-label="Menu categories">
-        {categoryTabs.map((category) => (
-          <button
-            key={category.id}
-            type="button"
-            onClick={() => setActiveCategory(category.id)}
-            className={activeCategory === category.id ? 'is-active' : ''}
-            aria-pressed={activeCategory === category.id}
-            aria-controls="menu-results"
-          >
-            {category.label}
-          </button>
-        ))}
-      </nav>
+      {(tableSession.status === 'exchanging' || menuState.status === 'idle' || menuState.status === 'loading') && (
+        <MenuSkeleton />
+      )}
 
-      <div id="menu-results" className="menu-sections" aria-live="polite">
-        {visibleCategories.map((category) => {
-          const items = menuItems.filter((item) => item.category === category.id)
-          if (items.length === 0) return null
-          return (
-            <section key={category.id} id={category.id} className="menu-section">
-              <h2>
-                <span aria-hidden="true">{category.icon}</span> {category.label}
-              </h2>
-              <div className="menu-list">
-                {items.map((item) => (
-                  <ProductCard key={item.id} item={item} />
-                ))}
-              </div>
-            </section>
-          )
-        })}
-      </div>
+      {menuState.status === 'error' && (
+        <div className="menu-feedback" role="alert">
+          <h2>Menu unavailable</h2>
+          <p>{menuState.message}</p>
+          <button type="button" className="outline-action" onClick={menuState.retry}>
+            <RefreshCw aria-hidden="true" size={20} /> Try again
+          </button>
+        </div>
+      )}
+
+      {menuState.status === 'ready' && menuState.menu.items.length === 0 && (
+        <div className="menu-feedback">
+          <h2>No dishes available</h2>
+          <p>The kitchen has not published any menu items yet. Please check again shortly.</p>
+          <button type="button" className="outline-action" onClick={menuState.retry}>
+            <RefreshCw aria-hidden="true" size={20} /> Refresh menu
+          </button>
+        </div>
+      )}
+
+      {menuState.status === 'ready' && menuState.menu.items.length > 0 && (
+        <>
+          <CategoryTabs
+            categories={menuState.menu.categories}
+            activeCategory={activeCategory}
+            onChange={setActiveCategory}
+          />
+          <div id="menu-results" className="menu-sections" role="tabpanel" aria-live="polite">
+            {sections.map((section) => (
+              <MenuSection key={section.category} category={section.category} items={section.items} />
+            ))}
+          </div>
+        </>
+      )}
 
       {itemCount > 0 && (
         <div className="bottom-action-wrap">
           <Link
-            to={`/cart?table=${tableNumber}`}
+            to="/cart"
             className="primary-action primary-action--orange"
-            aria-label={`Open your grill with ${itemCount} items, total ${total} baht`}
+            aria-label={`Open your grill with ${itemCount} items, total ${formatMenuPrice(total)}`}
           >
             <span><ShoppingCart aria-hidden="true" size={22} /> Your grill · {itemCount}</span>
-            <span>฿{total.toLocaleString('th-TH')} <ArrowRight aria-hidden="true" size={20} /></span>
+            <span>{formatMenuPrice(total)} <ArrowRight aria-hidden="true" size={20} /></span>
           </Link>
         </div>
       )}

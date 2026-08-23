@@ -9,22 +9,27 @@ const args = Object.fromEntries(
   }),
 )
 
-const tableNumber = args.table
+const tableLabel = args.label
+const qrCode = args['qr-code']
 const baseUrl = args['base-url']
 
-if (!tableNumber || !/^[1-9]\d{0,2}$/.test(tableNumber)) {
-  throw new Error('กรุณาระบุหมายเลขโต๊ะ 1-999 เช่น --table=12')
+if (!tableLabel || !/^[a-zA-Z0-9_-]+$/.test(tableLabel)) {
+  throw new Error('กรุณาระบุชื่อโต๊ะ เช่น --label=A01')
+}
+
+if (!qrCode || !/^kbq_[^.]+\..+$/.test(qrCode)) {
+  throw new Error('กรุณาระบุ QR code ที่ Backend ออกให้ผ่าน --qr-code')
 }
 
 if (!baseUrl) {
   throw new Error('กรุณาระบุ URL ของเว็บ เช่น --base-url=https://order.example.com')
 }
 
-const orderUrl = new URL(baseUrl)
-orderUrl.searchParams.set('table', tableNumber)
+const orderUrl = new URL('/menu', baseUrl)
+orderUrl.hash = new URLSearchParams({ qr: qrCode }).toString()
 
 const outputDirectory = resolve('public/qrcodes')
-const outputPath = resolve(outputDirectory, `table-${tableNumber}.png`)
+const outputPath = resolve(outputDirectory, `table-${tableLabel}.png`)
 
 await mkdir(outputDirectory, { recursive: true })
 await QRCode.toFile(outputPath, orderUrl.toString(), {
@@ -37,5 +42,4 @@ await QRCode.toFile(outputPath, orderUrl.toString(), {
   },
 })
 
-console.log(`สร้าง QR โต๊ะ ${tableNumber}: ${outputPath}`)
-console.log(`URL: ${orderUrl}`)
+console.log(`สร้าง QR โต๊ะ ${tableLabel}: ${outputPath}`)
