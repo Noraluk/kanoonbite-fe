@@ -1,4 +1,5 @@
-import { AlertCircle, ChefHat, Clock3, LoaderCircle, RefreshCw, Wifi, WifiOff } from 'lucide-react'
+import { useEffect } from 'react'
+import { AlertCircle, BellRing, ChefHat, Clock3, LoaderCircle, RefreshCw, Wifi, WifiOff, X } from 'lucide-react'
 import type { NextOrderStatus } from '../api/admin.api'
 import type { Order, OrderStatus } from '../types/order'
 import { formatOrderPrice } from '../utils/order'
@@ -35,7 +36,18 @@ function formatRelativeTime(createdAt: string) {
 }
 
 export function AdminOrdersPage() {
-  const { orders, isInitialLoading, error, pendingOrderIds, connectionStatus, pollIntervalMs, refresh, updateStatus } = useKitchenOrders()
+  const {
+    orders,
+    isInitialLoading,
+    error,
+    pendingOrderIds,
+    newOrderNotification,
+    connectionStatus,
+    pollIntervalMs,
+    dismissNewOrderNotification,
+    refresh,
+    updateStatus,
+  } = useKitchenOrders()
   const openOrders = orders.filter((order) => ['received', 'preparing', 'ready'].includes(order.status)).length
   const visibleConnectionStatus = isInitialLoading ? 'connecting' : connectionStatus
   const connectionCopy = {
@@ -44,6 +56,12 @@ export function AdminOrdersPage() {
     reconnecting: 'Reconnecting — backup refresh is active',
     offline: `Offline — refreshing every ${pollIntervalMs / 1_000} seconds`,
   }[visibleConnectionStatus]
+
+  useEffect(() => {
+    if (!newOrderNotification) return
+    const timeoutId = window.setTimeout(dismissNewOrderNotification, 8_000)
+    return () => window.clearTimeout(timeoutId)
+  }, [dismissNewOrderNotification, newOrderNotification])
 
   return (
     <section className="admin-page admin-orders-page" aria-labelledby="admin-orders-title">
@@ -63,6 +81,27 @@ export function AdminOrdersPage() {
           {connectionCopy}
         </p>
       </div>
+
+      {newOrderNotification && (
+        <aside className="admin-new-order-notification" role="alert" aria-atomic="true">
+          <span className="admin-new-order-notification__icon"><BellRing aria-hidden="true" size={23} /></span>
+          <div>
+            <strong>{newOrderNotification.count === 1
+              ? `New order #${newOrderNotification.orderNumber}`
+              : `${newOrderNotification.count} new orders`}</strong>
+            <span>{newOrderNotification.count === 1
+              ? `Table ${newOrderNotification.tableLabel} just placed an order.`
+              : 'New customer orders are ready for the kitchen.'}</span>
+          </div>
+          <button
+            type="button"
+            aria-label="Dismiss new order notification"
+            onClick={dismissNewOrderNotification}
+          >
+            <X aria-hidden="true" size={20} />
+          </button>
+        </aside>
+      )}
 
       <div className="admin-stat-grid" aria-label="Order summary">
         <article className="admin-stat-card">
@@ -98,7 +137,7 @@ export function AdminOrdersPage() {
           <p>New and completed kitchen orders will appear here automatically.</p>
         </div>
       ) : (
-        <div className="admin-order-list" aria-label="Orders" aria-live="polite">
+        <div className="admin-order-list" aria-label="Orders">
           {orders.map((order) => {
             const action = actionCopy[order.status]
             const isPending = pendingOrderIds.has(order.id)

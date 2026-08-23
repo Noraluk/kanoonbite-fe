@@ -231,6 +231,36 @@ describe('admin backoffice', () => {
     }
   })
 
+  it('uses the four-second fallback while realtime is unavailable', async () => {
+    vi.useFakeTimers()
+    authenticate()
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(ordersResponse('received'))
+      .mockResolvedValueOnce(emptyOrdersResponse())
+      .mockResolvedValueOnce(ordersResponse('received'))
+      .mockResolvedValueOnce(emptyOrdersResponse())
+    vi.stubGlobal('fetch', fetchMock)
+    const view = renderAt('/admin/orders')
+
+    try {
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(screen.getByRole('status')).toHaveTextContent('refreshing every 4 seconds')
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(3_999) })
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+      expect(fetchMock).toHaveBeenCalledTimes(4)
+    } finally {
+      view.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('restarts the immediate request when development Strict Mode aborts the first mount', async () => {
     authenticate()
     let requestNumber = 0
@@ -298,6 +328,8 @@ describe('admin backoffice', () => {
     }))
 
     expect(await screen.findByText('#4')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('New order #4')
+    expect(screen.getByRole('alert')).toHaveTextContent('Table 1 just placed an order.')
     expect(fetchMock).toHaveBeenCalledTimes(7)
     view.unmount()
     expect(socket.close).toHaveBeenCalled()

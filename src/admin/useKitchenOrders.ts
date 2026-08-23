@@ -6,8 +6,16 @@ import type { Order } from '../types/order'
 import { useAdminAuthStore } from './adminAuthStore'
 import { useKitchenRealtime } from './useKitchenRealtime'
 
-const POLL_INTERVAL_MS = 30_000
+const LIVE_POLL_INTERVAL_MS = 30_000
+const FALLBACK_POLL_INTERVAL_MS = 4_000
 const RATE_LIMIT_PAUSE_MS = 15_000
+
+export interface NewOrderNotification {
+  id: string
+  count: number
+  orderNumber: number
+  tableLabel: string
+}
 
 function isAbortError(error: unknown) {
   return error instanceof DOMException && error.name === 'AbortError'
@@ -30,8 +38,11 @@ export function useKitchenOrders() {
   const [isInitialLoading, setIsInitialLoading] = useState(true)
   const [error, setError] = useState('')
   const [pendingOrderIds, setPendingOrderIds] = useState<Set<string>>(() => new Set())
+  const [newOrderNotification, setNewOrderNotification] = useState<NewOrderNotification | null>(null)
   const requestRef = useRef<AbortController | null>(null)
   const pausedUntilRef = useRef(0)
+  const knownOrderIdsRef = useRef<Set<string>>(new Set())
+  const hasLoadedOrdersRef = useRef(false)
 
   const abortActiveRequest = useCallback(() => {
     const activeRequest = requestRef.current
@@ -75,7 +86,24 @@ export function useKitchenOrders() {
     try {
       const activeOrders = await getKitchenOrders(accessToken, undefined, controller.signal)
       const completedOrders = await getKitchenOrders(accessToken, 'completed', controller.signal)
-      setOrders(mergeOrders(activeOrders, completedOrders))
+      const nextOrders = mergeOrders(activeOrders, completedOrders)
+      if (hasLoadedOrdersRef.current) {
+        const receivedOrders = nextOrders.filter((order) => (
+          order.status === 'received' && !knownOrderIdsRef.current.has(order.id)
+        ))
+        const latestOrder = receivedOrders.at(-1)
+        if (latestOrder) {
+          setNewOrderNotification({
+            id: latestOrder.id,
+            count: receivedOrders.length,
+            orderNumber: latestOrder.orderNumber,
+            tableLabel: latestOrder.table.label,
+          })
+        }
+      }
+      knownOrderIdsRef.current = new Set(nextOrders.map((order) => order.id))
+      hasLoadedOrdersRef.current = true
+      setOrders(nextOrders)
       if (!preserveError) setError('')
     } catch (requestError) {
       if (!isAbortError(requestError)) handleApiError(requestError, 'Cannot load live orders. Please retry.')
@@ -84,6 +112,25 @@ export function useKitchenOrders() {
       setIsInitialLoading(false)
     }
   }, [abortActiveRequest, accessToken, handleApiError])
+
+  const handleRealtimeUnauthorized = useCallback(() => {
+    signOut()
+    navigate('/admin/login', { replace: true })
+  }, [navigate, signOut])
+
+  const connectionStatus = useKitchenRealtime({
+    accessToken,
+    enabled: !isInitialLoading,
+    venueId,
+    // Reconcile after every connection so changes made during a disconnect cannot be missed.
+    onConnected: () => { void refresh(true) },
+    onEvent: () => { void refresh(true) },
+    onUnauthorized: handleRealtimeUnauthorized,
+  })
+
+  const pollIntervalMs = connectionStatus === 'live'
+    ? LIVE_POLL_INTERVAL_MS
+    : FALLBACK_POLL_INTERVAL_MS
 
   // Initial page load is intentionally independent from the polling timer.
   useEffect(() => {
@@ -95,7 +142,7 @@ export function useKitchenOrders() {
   useEffect(() => {
     const intervalId = window.setInterval(() => {
       if (document.visibilityState === 'visible') void refresh()
-    }, POLL_INTERVAL_MS)
+    }, pollIntervalMs)
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') abortActiveRequest()
@@ -107,7 +154,7 @@ export function useKitchenOrders() {
       window.clearInterval(intervalId)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [abortActiveRequest, refresh])
+  }, [abortActiveRequest, pollIntervalMs, refresh])
 
   const updateStatus = useCallback(async (orderId: string, status: NextOrderStatus) => {
     if (!accessToken) return
@@ -134,28 +181,19 @@ export function useKitchenOrders() {
     }
   }, [accessToken, handleApiError, refresh])
 
-  const handleRealtimeUnauthorized = useCallback(() => {
-    signOut()
-    navigate('/admin/login', { replace: true })
-  }, [navigate, signOut])
-
-  const connectionStatus = useKitchenRealtime({
-    accessToken,
-    enabled: !isInitialLoading,
-    venueId,
-    // Reconcile after every connection so changes made during a disconnect cannot be missed.
-    onConnected: () => { void refresh(true) },
-    onEvent: () => { void refresh(true) },
-    onUnauthorized: handleRealtimeUnauthorized,
-  })
+  const dismissNewOrderNotification = useCallback(() => {
+    setNewOrderNotification(null)
+  }, [])
 
   return {
     orders,
     isInitialLoading,
     error,
     pendingOrderIds,
+    newOrderNotification,
     connectionStatus,
-    pollIntervalMs: POLL_INTERVAL_MS,
+    pollIntervalMs,
+    dismissNewOrderNotification,
     refresh: () => refresh(true),
     updateStatus,
   }
