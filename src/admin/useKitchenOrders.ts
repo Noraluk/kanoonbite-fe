@@ -4,7 +4,7 @@ import { getKitchenOrders, type NextOrderStatus, updateKitchenOrderStatus } from
 import { ApiError } from '../types/api'
 import type { Order } from '../types/order'
 import { useAdminAuthStore } from './adminAuthStore'
-import { useKitchenRealtime } from './useKitchenRealtime'
+import { useKitchenRealtime, type KitchenRealtimeEvent } from './useKitchenRealtime'
 
 const LIVE_POLL_INTERVAL_MS = 30_000
 const FALLBACK_POLL_INTERVAL_MS = 4_000
@@ -118,13 +118,42 @@ export function useKitchenOrders() {
     navigate('/admin/login', { replace: true })
   }, [navigate, signOut])
 
+  const handleRealtimeEvent = useCallback((event: KitchenRealtimeEvent) => {
+    const realtimeOrder = event.order
+    if (realtimeOrder) {
+      knownOrderIdsRef.current.add(realtimeOrder.id)
+      setOrders((current) => {
+        const existing = current.find((order) => order.id === realtimeOrder.id)
+        if (existing && Date.parse(existing.updatedAt) > Date.parse(realtimeOrder.updatedAt)) {
+          return current
+        }
+        return mergeOrders(
+          [...current.filter((order) => order.id !== realtimeOrder.id), realtimeOrder],
+          [],
+        )
+      })
+
+      if (event.type === 'order.created' && realtimeOrder.status === 'received') {
+        setNewOrderNotification((current) => ({
+          id: realtimeOrder.id,
+          count: (current?.count ?? 0) + 1,
+          orderNumber: realtimeOrder.orderNumber,
+          tableLabel: realtimeOrder.table.label,
+        }))
+      }
+    }
+
+    // PostgreSQL remains authoritative; reconcile without delaying the UI update.
+    void refresh(true)
+  }, [refresh])
+
   const connectionStatus = useKitchenRealtime({
     accessToken,
     enabled: !isInitialLoading,
     venueId,
     // Reconcile after every connection so changes made during a disconnect cannot be missed.
     onConnected: () => { void refresh(true) },
-    onEvent: () => { void refresh(true) },
+    onEvent: handleRealtimeEvent,
     onUnauthorized: handleRealtimeUnauthorized,
   })
 

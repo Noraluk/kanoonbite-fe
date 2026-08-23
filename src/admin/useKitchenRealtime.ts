@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { getKitchenRealtimeTicket } from '../api/admin.api'
 import { ApiError } from '../types/api'
-import type { OrderStatus } from '../types/order'
+import type { Order, OrderStatus } from '../types/order'
 
 export type KitchenConnectionStatus = 'connecting' | 'live' | 'reconnecting' | 'offline'
 
@@ -12,6 +12,8 @@ export type KitchenRealtimeEvent = {
   orderId: string
   status?: OrderStatus
   occurredAt: string
+  updatedAt: string
+  order?: Order
 }
 
 interface UseKitchenRealtimeOptions {
@@ -25,7 +27,6 @@ interface UseKitchenRealtimeOptions {
 
 const FIRST_RECONNECT_DELAY_MS = 1_000
 const MAX_RECONNECT_DELAY_MS = 30_000
-const EVENT_COALESCE_MS = 100
 const AUTHENTICATION_CLOSE_CODES = new Set([4_001, 4_003, 4_401, 4_403])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -34,6 +35,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isOrderStatus(value: unknown): value is OrderStatus {
   return ['received', 'preparing', 'ready', 'completed', 'cancelled'].includes(String(value))
+}
+
+function isOrder(value: unknown, orderId: string): value is Order {
+  if (!isRecord(value) || !isRecord(value.table) || !Array.isArray(value.items)) return false
+  return value.id === orderId
+    && typeof value.orderNumber === 'number'
+    && Number.isInteger(value.orderNumber)
+    && typeof value.table.id === 'string'
+    && typeof value.table.label === 'string'
+    && typeof value.total === 'number'
+    && typeof value.currency === 'string'
+    && isOrderStatus(value.status)
+    && typeof value.createdAt === 'string'
+    && typeof value.updatedAt === 'string'
 }
 
 function parseKitchenEvent(data: unknown, venueId?: string): KitchenRealtimeEvent | null {
@@ -48,8 +63,10 @@ function parseKitchenEvent(data: unknown, venueId?: string): KitchenRealtimeEven
       || typeof event.venueId !== 'string'
       || typeof event.orderId !== 'string'
       || typeof event.occurredAt !== 'string'
+      || typeof event.updatedAt !== 'string'
       || (venueId && event.venueId !== venueId)
       || (event.type === 'order.updated' && event.status !== undefined && !isOrderStatus(event.status))
+      || (event.order !== undefined && !isOrder(event.order, event.orderId))
     ) return null
 
     return event as KitchenRealtimeEvent
@@ -95,8 +112,6 @@ export function useKitchenRealtime({
     let socket: WebSocket | null = null
     let ticketController: AbortController | null = null
     let reconnectTimer: number | null = null
-    let eventTimer: number | null = null
-    let latestEvent: KitchenRealtimeEvent | null = null
 
     const clearReconnectTimer = () => {
       if (reconnectTimer !== null) window.clearTimeout(reconnectTimer)
@@ -146,13 +161,7 @@ export function useKitchenRealtime({
           const event = parseKitchenEvent(message.data, venueId)
           if (!event) return
 
-          latestEvent = event
-          if (eventTimer !== null) window.clearTimeout(eventTimer)
-          eventTimer = window.setTimeout(() => {
-            eventTimer = null
-            if (latestEvent) onEventRef.current(latestEvent)
-            latestEvent = null
-          }, EVENT_COALESCE_MS)
+          onEventRef.current(event)
         })
         connectedSocket.addEventListener('close', (closeEvent) => {
           if (socket === connectedSocket) socket = null
@@ -194,7 +203,6 @@ export function useKitchenRealtime({
     return () => {
       disposed = true
       clearReconnectTimer()
-      if (eventTimer !== null) window.clearTimeout(eventTimer)
       ticketController?.abort()
       socket?.close(1_000, 'Kitchen page closed')
       window.removeEventListener('offline', handleOffline)

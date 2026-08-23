@@ -288,7 +288,7 @@ describe('admin backoffice', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3)
   })
 
-  it('refetches immediately when a realtime order event arrives', async () => {
+  it('shows a realtime order immediately while API reconciliation is pending', async () => {
     authenticate()
     MockWebSocket.instances = []
     vi.stubGlobal('WebSocket', MockWebSocket)
@@ -305,8 +305,8 @@ describe('admin backoffice', () => {
       }))
       .mockResolvedValueOnce(ordersResponse('received'))
       .mockResolvedValueOnce(emptyOrdersResponse())
-      .mockResolvedValueOnce(jsonResponse({ data: { orders: [createOrder('received'), newOrder] } }))
-      .mockResolvedValueOnce(emptyOrdersResponse())
+      // Keep reconciliation pending: the WebSocket snapshot must update the UI first.
+      .mockImplementation(() => new Promise<Response>(() => {}))
     vi.stubGlobal('fetch', fetchMock)
     const view = renderAt('/admin/orders')
 
@@ -325,12 +325,14 @@ describe('admin backoffice', () => {
       venueId: 'venue-1',
       orderId: 'order-2',
       occurredAt: new Date().toISOString(),
+      updatedAt: newOrder.updatedAt,
+      order: newOrder,
     }))
 
     expect(await screen.findByText('#4')).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent('New order #4')
     expect(screen.getByRole('alert')).toHaveTextContent('Table 1 just placed an order.')
-    expect(fetchMock).toHaveBeenCalledTimes(7)
+    expect(fetchMock).toHaveBeenCalledTimes(6)
     view.unmount()
     expect(socket.close).toHaveBeenCalled()
   })
