@@ -266,6 +266,7 @@ button { border: 0; }
   text-decoration: none;
 }
 .flow-title { margin: 6px 0 26px; font-size: clamp(36px, 8vw, 44px); line-height: 1; font-weight: 600; }
+.flow-title__icon { width: .9em; height: .9em; flex: 0 0 auto; color: var(--green); stroke-width: 2.4; }
 .cart-list { display: grid; gap: 18px; }
 .cart-card {
   min-height: 124px;
@@ -532,6 +533,101 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
     align-self: center;
     justify-self: end;
   }
+
+  .flow-screen { padding: 42px 28px 48px; }
+  .success-screen { padding: 38px 28px 48px; }
+  .back-link { min-height: 52px; gap: 10px; font-size: 24px; }
+  .back-link svg { width: 28px; height: 28px; }
+  .flow-title {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 10px 0 30px;
+    font-size: 48px;
+    line-height: 1.1;
+  }
+
+  .cart-list { gap: 24px; }
+  .cart-card {
+    min-height: 188px;
+    display: grid;
+    grid-template-columns: 128px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 24px;
+    padding: 24px;
+    border: 1px solid #e5eee0;
+    border-radius: 32px;
+    box-shadow: 0 10px 26px rgba(40, 73, 48, .07);
+  }
+  .cart-card .food-image-wrap--cart {
+    width: 128px;
+    height: 128px;
+    flex-basis: 128px;
+    border-radius: 27px;
+  }
+  .cart-card__copy h2 { font-size: 30px; line-height: 1.2; }
+  .cart-card__copy p { margin-top: 7px; font-size: 22px; line-height: 1.35; }
+  .cart-card__actions {
+    width: auto;
+    display: grid;
+    justify-items: end;
+    gap: 12px;
+    padding-left: 0;
+  }
+  .cart-card .round-control { width: 64px; height: 64px; flex-basis: 64px; }
+  .cart-card .quantity-control > span { min-width: 40px; font-size: 26px; }
+  .remove-button { min-height: 48px; gap: 8px; padding-inline: 8px; font-size: 20px; }
+  .remove-button svg { width: 23px; height: 23px; }
+  .subtotal-row { margin-top: 32px; padding-inline: 8px; font-size: 26px; }
+  .subtotal-row strong { font-size: 42px; }
+
+  .order-summary-card, .status-card, .receipt-card {
+    padding: 30px 28px;
+    border: 1px solid #e5eee0;
+    border-radius: 32px;
+    box-shadow: 0 10px 26px rgba(40, 73, 48, .06);
+  }
+  .order-summary-card ul { gap: 24px; }
+  .order-summary-card li { gap: 24px; font-size: 25px; line-height: 1.35; }
+  .review-item__details { gap: 6px; }
+  .review-item__details small { font-size: 20px; }
+  .summary-total { margin-top: 28px; padding-top: 24px; font-size: 25px; }
+  .summary-total strong { font-size: 41px; }
+  .review-form { gap: 12px; margin-top: 30px; }
+  .review-form label { margin-top: 12px; font-size: 24px; }
+  .review-form input, .review-form textarea { border-radius: 24px; font-size: 23px; }
+  .review-form input { min-height: 76px; padding-inline: 24px; }
+  .review-form textarea { min-height: 132px; padding: 22px 24px; line-height: 1.5; }
+  .payment-note { gap: 18px; margin-top: 30px; padding: 26px 28px; font-size: 22px; line-height: 1.55; }
+  .payment-note > svg { width: 30px; height: 30px; }
+
+  .order-state-icon { width: 126px; height: 126px; margin-bottom: 24px; }
+  .order-state-icon svg { width: 58px; height: 58px; }
+  .success-screen > h1 { font-size: 48px; line-height: 1.1; }
+  .order-meta { margin: 10px 0 30px; font-size: 24px; }
+  .status-card { gap: 26px; }
+  .status-step { gap: 24px; color: #7b8a75; }
+  .status-dot { width: 72px; height: 72px; flex-basis: 72px; font-size: 27px; }
+  .status-step strong { font-size: 29px; line-height: 1.2; }
+  .status-step p { margin-top: 5px; font-size: 22px; line-height: 1.4; }
+  .receipt-card { margin-top: 24px; }
+  .receipt-card h2 { margin-bottom: 20px; font-size: 22px; }
+  .order-dishes { gap: 18px; }
+  .order-dishes li { gap: 24px; font-size: 23px; line-height: 1.4; }
+  .order-note { font-size: 21px !important; }
+
+  .flow-screen > .bottom-action-wrap,
+  .success-screen > .bottom-action-wrap {
+    position: static;
+    width: 100%;
+    margin-top: 34px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+    transform: none;
+  }
+  .flow-screen > .bottom-action-wrap::before,
+  .success-screen > .bottom-action-wrap::before { display: none; }
+  .flow-screen .primary-action,
+  .success-screen .outline-action { min-height: 80px; padding-inline: 30px; font-size: 26px; }
 }
 
 @media (max-width: 375px) {

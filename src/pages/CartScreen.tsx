@@ -1,9 +1,25 @@
-import { ArrowLeft, ArrowRight, ImageOff, Minus, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Beef, Fish, ImageOff, Minus, Plus, ShoppingCart, Soup, Trash2, Utensils } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { getValidTableSession } from '../auth/table-session.storage'
 import { ScanQrAgain } from '../components/menu/ScanQrAgain'
 import { useCartStore } from '../store/cartStore'
 import { formatMenuPrice } from '../utils/menu'
+
+function isPlaceholderImage(imageUrl: string) {
+  try {
+    const hostname = new URL(imageUrl).hostname.toLowerCase()
+    return hostname === 'placehold.co' || hostname === 'via.placeholder.com'
+  } catch {
+    return false
+  }
+}
+
+function CartItemIcon({ name }: { name: string }) {
+  const itemName = name.toLowerCase()
+  if (itemName.includes('seafood') || itemName.includes('prawn') || itemName.includes('squid')) return <Fish aria-hidden="true" />
+  if (itemName.includes('vegetable') || itemName.includes('rice') || itemName.includes('side')) return <Soup aria-hidden="true" />
+  return <Beef aria-hidden="true" />
+}
 
 export function CartScreen() {
   const tableSession = getValidTableSession()
@@ -22,11 +38,13 @@ export function CartScreen() {
       <Link to={menuUrl} className="back-link">
         <ArrowLeft aria-hidden="true" size={21} /> Back to menu
       </Link>
-      <h1 id="cart-heading" className="flow-title">Your grill <span aria-hidden="true">🛒</span></h1>
+      <h1 id="cart-heading" className="flow-title">
+        Your grill <ShoppingCart className="flow-title__icon" aria-hidden="true" />
+      </h1>
 
       {cartItems.length === 0 ? (
         <div className="empty-state">
-          <span aria-hidden="true">🍢</span>
+          <Utensils aria-hidden="true" size={58} />
           <h2>Your grill is waiting</h2>
           <p>Add a dish or two, then come back here.</p>
           <Link to={menuUrl} className="outline-action">Back to menu</Link>
@@ -35,13 +53,16 @@ export function CartScreen() {
         <>
           <div className="cart-list">
             {cartItems.map((cartItem) => {
+              const showImageFallback = !cartItem.imageUrl || isPlaceholderImage(cartItem.imageUrl)
               return (
                 <article key={cartItem.productId} className="cart-card">
                   <div className="food-image-wrap food-image-wrap--cart">
-                    {cartItem.imageUrl ? (
-                      <img className="food-image" src={cartItem.imageUrl} alt="" />
+                    {showImageFallback ? (
+                      <div className="food-image-fallback" role="img" aria-label={`No image available for ${cartItem.name}`}>
+                        {cartItem.name ? <CartItemIcon name={cartItem.name} /> : <ImageOff aria-hidden="true" />}
+                      </div>
                     ) : (
-                      <div className="food-image-fallback" aria-hidden="true"><ImageOff size={26} /></div>
+                      <img className="food-image" src={cartItem.imageUrl} alt="" loading="lazy" />
                     )}
                   </div>
                   <div className="cart-card__copy">
