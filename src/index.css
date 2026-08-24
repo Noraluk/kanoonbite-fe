@@ -507,7 +507,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .menu-list { gap: 24px; }
   .menu-card {
     min-height: 212px;
-    grid-template-columns: 140px minmax(0, 1fr) 76px;
+    grid-template-columns: 140px minmax(0, 1fr) auto;
     gap: 24px;
     padding: 28px 24px;
     border-radius: 34px;
@@ -526,6 +526,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .round-control { width: 72px; height: 72px; flex-basis: 72px; }
   .round-control svg { width: 32px; height: 32px; }
   .quantity-control > span { min-width: 42px; font-size: 28px; }
+  .menu-card > .quantity-control {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: center;
+    justify-self: end;
+  }
 }
 
 @media (max-width: 375px) {
