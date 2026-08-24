@@ -417,7 +417,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .app-shell { border-width: 0; border-radius: 0; }
 }
 
-@media (max-width: 520px) {
+/* Samsung Internet and QR scanner WebViews can expose a desktop-like layout
+   viewport on phones. Keep the customer ordering UI full-screen through the
+   tablet range instead of relying on a phone-only breakpoint. */
+@media (max-width: 1100px) {
   .app-canvas,
   .app-shell,
   .app-content { width: 100%; min-height: 100svh; }
@@ -429,32 +432,32 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
     border-radius: 0 0 34px 34px;
   }
   .menu-hero__welcome { justify-content: flex-start; }
-  .menu-hero__meta { font-size: 18px; }
-  .menu-hero h1 { font-size: clamp(40px, 12vw, 52px); }
-  .menu-hero p { margin-top: 8px; font-size: 19px; line-height: 1.4; }
+  .menu-hero__meta { font-size: 20px; }
+  .menu-hero h1 { font-size: clamp(46px, 12vw, 58px); }
+  .menu-hero p { margin-top: 8px; font-size: 22px; line-height: 1.4; }
   .category-tabs { padding: 24px 16px 20px; }
-  .category-tabs button { min-height: 52px; padding-inline: 22px; font-size: 18px; }
+  .category-tabs button { min-height: 56px; padding-inline: 24px; font-size: 20px; }
   .menu-sections, .flow-screen { padding-inline: 16px; }
-  .menu-section h2 { margin-bottom: 18px; font-size: 24px; }
+  .menu-section h2 { margin-bottom: 18px; font-size: 28px; }
   .menu-list { gap: 18px; }
   .menu-card {
     min-height: 154px;
     display: grid;
-    grid-template-columns: 88px minmax(0, 1fr) auto;
+    grid-template-columns: 96px minmax(0, 1fr) auto;
     gap: 14px;
     padding: 20px 16px;
     border-radius: 28px;
   }
   .menu-card .food-image-wrap {
-    width: 88px;
-    height: 88px;
-    flex-basis: 88px;
+    width: 96px;
+    height: 96px;
+    flex-basis: 96px;
     border-radius: 22px;
   }
-  .menu-card__copy h3 { font-size: 21px; line-height: 1.2; }
-  .menu-card__copy p { margin-block: 5px 7px; font-size: 16px; line-height: 1.45; }
-  .menu-card__copy strong { font-size: 22px; }
-  .round-control { width: 52px; height: 52px; flex-basis: 52px; }
+  .menu-card__copy h3 { font-size: 24px; line-height: 1.2; }
+  .menu-card__copy p { margin-block: 5px 7px; font-size: 18px; line-height: 1.45; }
+  .menu-card__copy strong { font-size: 25px; }
+  .round-control { width: 56px; height: 56px; flex-basis: 56px; }
   .menu-card > .quantity-control {
     grid-column: 2 / -1;
     justify-self: end;
