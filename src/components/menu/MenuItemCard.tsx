@@ -1,4 +1,4 @@
-import { ImageOff, Minus, Plus } from 'lucide-react'
+import { Beef, CupSoda, Fish, ImageOff, Minus, Plus, Soup, UtensilsCrossed } from 'lucide-react'
 import { useState } from 'react'
 import { useCartStore } from '../../store/cartStore'
 import type { MenuItem } from '../../types/menu'
@@ -9,8 +9,27 @@ interface MenuItemCardProps {
   onAdd?: (item: MenuItem) => void
 }
 
+function isPlaceholderImage(imageUrl: string) {
+  try {
+    const hostname = new URL(imageUrl).hostname.toLowerCase()
+    return hostname === 'placehold.co' || hostname === 'via.placeholder.com'
+  } catch {
+    return false
+  }
+}
+
+function CategoryIcon({ item }: { item: MenuItem }) {
+  const itemKind = `${item.category} ${item.name}`.toLowerCase()
+  if (itemKind.includes('seafood') || itemKind.includes('prawn') || itemKind.includes('squid')) return <Fish aria-hidden="true" />
+  if (itemKind.includes('drink')) return <CupSoda aria-hidden="true" />
+  if (itemKind.includes('side') || itemKind.includes('rice')) return <Soup aria-hidden="true" />
+  if (itemKind.includes('meat') || itemKind.includes('grill')) return <Beef aria-hidden="true" />
+  return <UtensilsCrossed aria-hidden="true" />
+}
+
 export function MenuItemCard({ item, onAdd }: MenuItemCardProps) {
   const [imageFailed, setImageFailed] = useState(false)
+  const showImageFallback = imageFailed || !item.imageUrl || isPlaceholderImage(item.imageUrl)
   const quantity = useCartStore(
     (state) => state.items.find((cartItem) => cartItem.productId === item.id)?.quantity ?? 0,
   )
@@ -26,9 +45,9 @@ export function MenuItemCard({ item, onAdd }: MenuItemCardProps) {
     <article className="menu-card">
       {item.isPopular && <span className="popular-badge">POPULAR</span>}
       <div className="food-image-wrap">
-        {imageFailed || !item.imageUrl ? (
+        {showImageFallback ? (
           <div className="food-image-fallback" role="img" aria-label={`No image available for ${item.name}`}>
-            <ImageOff aria-hidden="true" size={30} />
+            {item.category ? <CategoryIcon item={item} /> : <ImageOff aria-hidden="true" />}
           </div>
         ) : (
           <img

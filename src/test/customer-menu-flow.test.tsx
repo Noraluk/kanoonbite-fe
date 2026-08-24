@@ -196,4 +196,17 @@ describe('customer menu presentation', () => {
 
     expect(screen.getByRole('img', { name: 'No image available for Pork Value Set' })).toBeInTheDocument()
   })
+
+  it('uses the designed fallback instead of a generic placeholder image', async () => {
+    saveTableSession(tableSession)
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse({
+      ...menu,
+      items: [{ ...menu.items[0], imageUrl: 'https://placehold.co/400x400?text=Pork' }],
+    }))))
+
+    renderMenu()
+
+    expect(await screen.findByRole('img', { name: 'No image available for Pork Value Set' })).toBeInTheDocument()
+    expect(document.querySelector('img[src*="placehold.co"]')).not.toBeInTheDocument()
+  })
 })
