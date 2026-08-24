@@ -374,8 +374,10 @@ describe('admin backoffice', () => {
       order: newOrder,
     }))
 
-    expect(await screen.findByText('#4')).toBeInTheDocument()
-    expect(document.querySelector('.admin-order-card')).toHaveTextContent('#4')
+    const realtimeOrderHeading = await screen.findByText('#4')
+    const realtimeOrderCard = realtimeOrderHeading.closest('article')
+    expect(realtimeOrderCard).not.toBeNull()
+    expect(realtimeOrderCard).toHaveTextContent('#4')
     expect(screen.getByRole('alert')).toHaveTextContent('New order #4')
     expect(screen.getByRole('alert')).toHaveTextContent('Table 1 just placed an order.')
     expect(fetchMock).toHaveBeenCalledTimes(6)
@@ -384,8 +386,6 @@ describe('admin backoffice', () => {
       cache: 'no-store',
     }))
 
-    const realtimeOrderCard = screen.getByText('#4').closest('article')
-    expect(realtimeOrderCard).not.toBeNull()
     fireEvent.click(within(realtimeOrderCard!).getByRole('button', { name: 'Start grilling' }))
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(7))
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -450,8 +450,9 @@ describe('admin backoffice', () => {
     expect(await screen.findByText('#16')).toBeInTheDocument()
     resolveStaleReconciliation(ordersResponse('received'))
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(7))
-    expect(screen.getByText('#16')).toBeInTheDocument()
-    expect(document.querySelector('.admin-order-card')).toHaveTextContent('#16')
+    const realtimeOrderCard = screen.getByText('#16').closest('article')
+    expect(realtimeOrderCard).not.toBeNull()
+    expect(realtimeOrderCard).toHaveTextContent('#16')
 
     view.unmount()
   })
