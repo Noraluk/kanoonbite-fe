@@ -246,6 +246,12 @@ export function useKitchenOrders() {
         await refresh(true, true)
       } else if (!isAbortError(requestError)) {
         handleApiError(requestError, 'Cannot update this order. Its status was not changed.')
+        // A backend side effect can succeed even when its response fails (for example,
+        // when publishing the realtime event times out). Reconcile immediately instead
+        // of waiting for the next polling interval to reveal the committed status.
+        if (!(requestError instanceof ApiError) || requestError.status !== 401) {
+          await refresh(true, true)
+        }
       }
     } finally {
       setPendingOrderIds((current) => {

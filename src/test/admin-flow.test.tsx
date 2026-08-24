@@ -116,6 +116,51 @@ describe('admin backoffice', () => {
     expect(sessionStorage.getItem('kanoonbite.adminSession')).not.toContain('secret')
   })
 
+  it('keeps the API status while the update request is pending', async () => {
+    authenticate()
+    let resolveUpdate: ((response: Response) => void) | undefined
+    const pendingUpdate = new Promise<Response>((resolve) => { resolveUpdate = resolve })
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(ordersResponse('received'))
+      .mockResolvedValueOnce(emptyOrdersResponse())
+      .mockImplementationOnce(() => pendingUpdate)
+      .mockResolvedValueOnce(ordersResponse('preparing'))
+      .mockResolvedValueOnce(emptyOrdersResponse())
+    vi.stubGlobal('fetch', fetchMock)
+    renderAt('/admin/orders')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Start grilling' }))
+
+    expect(screen.getByText('New')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Updating…' })).toBeDisabled()
+
+    await act(async () => {
+      resolveUpdate?.(jsonResponse({ data: createOrder('preparing') }))
+    })
+    expect(await screen.findByRole('button', { name: 'Mark ready' })).toBeEnabled()
+  })
+
+  it('reconciles immediately when the update response fails after the status was committed', async () => {
+    authenticate()
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(ordersResponse('received'))
+      .mockResolvedValueOnce(emptyOrdersResponse())
+      .mockResolvedValueOnce(jsonResponse({
+        error: { code: 'REALTIME_PUBLISH_FAILED', message: 'Publish failed' },
+      }, 500))
+      .mockResolvedValueOnce(ordersResponse('preparing'))
+      .mockResolvedValueOnce(emptyOrdersResponse())
+    vi.stubGlobal('fetch', fetchMock)
+    renderAt('/admin/orders')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Start grilling' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('service is unavailable')
+    expect(screen.getByText('Cooking')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Mark ready' })).toBeEnabled()
+    expect(fetchMock).toHaveBeenCalledTimes(5)
+  })
+
   it('clears an expired or invalid JWT and returns to login on 401', async () => {
     authenticate()
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse({
